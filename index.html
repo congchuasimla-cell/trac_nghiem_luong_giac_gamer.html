@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trò chơi: Chiến Binh Lượng Giác</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;1,600&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        serif: ['"Playfair Display"', 'serif'],
+                    },
+                    boxShadow: {
+                        'neon-pink': '0 0 15px rgba(236, 72, 153, 0.5), 0 0 5px rgba(236, 72, 153, 0.2)',
+                        'neon-cyan': '0 0 15px rgba(6, 182, 212, 0.5), 0 0 5px rgba(6, 182, 212, 0.2)',
+                        'neon-green': '0 0 15px rgba(16, 185, 129, 0.5), 0 0 5px rgba(16, 185, 129, 0.2)',
+                        'neon-red': '0 0 15px rgba(239, 68, 68, 0.5), 0 0 5px rgba(239, 68, 68, 0.2)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Glowing & Grid Background Anim */
+        .bg-grid {
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, rgba(244, 63, 94, 0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(244, 63, 94, 0.05) 1px, transparent 1px);
+        }
+        .neon-glow-pink {
+            text-shadow: 0 0 10px rgba(236, 72, 153, 0.6), 0 0 20px rgba(236, 72, 153, 0.3);
+        }
+        .neon-glow-cyan {
+            text-shadow: 0 0 10px rgba(6, 182, 212, 0.6), 0 0 20px rgba(6, 182, 212, 0.3);
+        }
+        /* Custom Math Elements Styling */
+        .math-style {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-gray-100 min-h-screen flex flex-col justify-between overflow-x-hidden relative bg-grid font-sans">
+
+    <!-- Sound Effect System (Synthesized via Web Audio API) -->
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'click') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+                } else if (type === 'correct') {
+                    // Quick success arpeggio
+                    const now = audioCtx.currentTime;
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+                    osc.frequency.setValueAtTime(1046.50, now + 0.3); // C6
+                    
+                    osc.start();
+                    osc.stop(now + 0.4);
+                } else if (type === 'incorrect') {
+                    // Sad buzzing drop
+                    const now = audioCtx.currentTime;
+                    osc.type = 'sawtooth';
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.linearRampToValueAtTime(110, now + 0.4);
+                    osc.start();
+                    osc.stop(now + 0.5);
+                } else if (type === 'victory') {
+                    // Epic fanfare
+                    const now = audioCtx.currentTime;
+                    osc.type = 'triangle';
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                    
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.15); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.3); // G5
+                    osc.frequency.setValueAtTime(1046.50, now + 0.45); // C6
+                    
+                    // Add secondary harmony oscillator
+                    const osc2 = audioCtx.createOscillator();
+                    const gain2 = audioCtx.createGain();
+                    osc2.type = 'sine';
+                    osc2.connect(gain2);
+                    gain2.connect(audioCtx.destination);
+                    gain2.gain.setValueAtTime(0.1, now);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                    osc2.frequency.setValueAtTime(392.00, now); // G4
+                    osc2.frequency.setValueAtTime(523.25, now + 0.15); // C5
+                    osc2.frequency.setValueAtTime(659.25, now + 0.3); // E5
+                    osc2.frequency.setValueAtTime(783.99, now + 0.45); // G5
+                    
+                    osc.start();
+                    osc2.start();
+                    osc.stop(now + 0.8);
+                    osc2.stop(now + 0.8);
+                }
+            } catch (e) {
+                console.log("Audio not allowed yet or error: ", e);
+            }
+        }
+    </script>
+
+    <!-- Header Grid decoration -->
+    <div class="absolute top-0 left-0 right-0 h-[400px] bg-gradient-to-b from-rose-500/10 via-fuchsia-500/5 to-transparent pointer-events-none z-0"></div>
+
+    <!-- MAIN APP WRAPPER -->
+    <main class="flex-grow flex items-center justify-center p-4 md:p-6 z-10 w-full max-w-5xl mx-auto">
+        
+        <!-- ================= WELCOME SCREEN ================= -->
+        <section id="welcome-screen" class="w-full bg-[#111827]/80 border border-fuchsia-500/30 rounded-3xl p-6 md:p-10 shadow-2xl backdrop-blur-xl flex flex-col items-center justify-center text-center">
+            <!-- Glowing Logo Icon -->
+            <div class="w-24 h-24 rounded-2xl bg-gradient-to-tr from-fuchsia-600 to-cyan-500 flex items-center justify-center text-5xl text-white shadow-neon-pink mb-6 transform rotate-6 hover:rotate-12 transition-transform duration-300">
+                <i class="fa-solid fa-calculator"></i>
+            </div>
+
+            <!-- Title -->
+            <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-2 uppercase">
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 via-rose-500 to-cyan-400 neon-glow-pink">Chiến Binh Lượng Giác</span>
+            </h1>
+            <p class="text-cyan-400 text-sm md:text-md tracking-widest font-mono uppercase mb-8">Hành trình chinh phục đỉnh cao Toán học</p>
+
+            <!-- Quiz Specs -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-3xl mb-8">
+                <div class="bg-gray-900/60 border border-gray-800 p-4 rounded-2xl flex flex-col items-center">
+                    <i class="fa-solid fa-clipboard-question text-fuchsia-500 text-2xl mb-1"></i>
+                    <span class="text-xs text-gray-400">Số câu hỏi</span>
+                    <span class="font-bold text-lg text-white">10 Câu</span>
+                </div>
+                <div class="bg-gray-900/60 border border-gray-800 p-4 rounded-2xl flex flex-col items-center">
+                    <i class="fa-solid fa-clock text-cyan-400 text-2xl mb-1"></i>
+                    <span class="text-xs text-gray-400">Thời gian làm bài</span>
+                    <span class="font-bold text-lg text-white">8 Phút</span>
+                </div>
+                <div class="bg-gray-900/60 border border-gray-800 p-4 rounded-2xl flex flex-col items-center">
+                    <i class="fa-solid fa-star text-amber-400 text-2xl mb-1"></i>
+                    <span class="text-xs text-gray-400">Điểm số</span>
+                    <span class="font-bold text-lg text-white">10đ / Câu</span>
+                </div>
+                <div class="bg-gray-900/60 border border-gray-800 p-4 rounded-2xl flex flex-col items-center">
+                    <i class="fa-solid fa-layer-group text-emerald-400 text-2xl mb-1"></i>
+                    <span class="text-xs text-gray-400">Độ khó</span>
+                    <span class="font-bold text-lg text-white">4 Mức độ</span>
+                </div>
+            </div>
+
+            <!-- Student Registration Form -->
+            <div class="w-full max-w-md bg-gray-900/40 p-6 rounded-2xl border border-gray-800 mb-8 text-left">
+                <h3 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4"><i class="fa-solid fa-user-pen mr-2 text-rose-500"></i>Nhập thông tin chiến binh</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="student-name" class="block text-xs font-semibold text-gray-400 uppercase mb-1">Họ và Tên</label>
+                        <input type="text" id="student-name" placeholder="Ví dụ: Nguyễn Văn An" 
+                               class="w-full bg-gray-950/80 border border-gray-800 hover:border-fuchsia-500/50 focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500 text-white rounded-xl px-4 py-3 text-sm transition-all duration-200">
+                    </div>
+                    <div>
+                        <label for="student-class" class="block text-xs font-semibold text-gray-400 uppercase mb-1">Lớp</label>
+                        <input type="text" id="student-class" placeholder="Ví dụ: 11A1" 
+                               class="w-full bg-gray-950/80 border border-gray-800 hover:border-cyan-500/50 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 text-white rounded-xl px-4 py-3 text-sm transition-all duration-200">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alert message -->
+            <div id="validation-alert" class="text-rose-400 text-xs mb-4 invisible">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i> Vui lòng nhập đầy đủ Họ tên và Lớp để bắt đầu!
+            </div>
+
+            <!-- Start Button -->
+            <button onclick="startGame()" class="px-8 py-4 bg-gradient-to-r from-fuchsia-600 via-rose-500 to-cyan-500 rounded-2xl text-white font-extrabold uppercase tracking-widest text-sm hover:scale-105 active:scale-95 transition-all duration-200 shadow-neon-pink">
+                Bắt đầu chinh phục <i class="fa-solid fa-chevron-right ml-2"></i>
+            </button>
+        </section>
+
+
+        <!-- ================= GAME PLAY SCREEN ================= -->
+        <section id="game-screen" class="w-full bg-[#111827]/80 border border-cyan-500/30 rounded-3xl p-6 shadow-2xl backdrop-blur-xl hidden flex flex-col justify-between">
+            <!-- Header Status Panel -->
+            <div class="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 border-b border-gray-800 pb-4 mb-6">
+                <!-- User card -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-fuchsia-600 flex items-center justify-center text-white text-md shadow-md">
+                        <i class="fa-solid fa-gamepad"></i>
+                    </div>
+                    <div>
+                        <h4 id="display-student-name" class="font-extrabold text-sm text-white">Chiến binh</h4>
+                        <p id="display-student-class" class="text-xs text-gray-400">Lớp: -</p>
+                    </div>
+                </div>
+
+                <!-- Timer countdown widget -->
+                <div class="flex items-center gap-3 bg-gray-900/60 px-4 py-2 rounded-2xl border border-gray-800 self-center md:self-auto min-w-[150px] justify-center">
+                    <i id="timer-icon" class="fa-solid fa-stopwatch text-cyan-400 animate-pulse text-lg"></i>
+                    <span id="display-timer" class="font-mono font-bold text-lg text-white">08:00</span>
+                </div>
+
+                <!-- Score indicator -->
+                <div class="flex items-center gap-3 bg-gray-900/60 px-4 py-2 rounded-2xl border border-gray-800 self-center md:self-auto">
+                    <i class="fa-solid fa-star text-amber-400 text-lg"></i>
+                    <span class="text-xs text-gray-400 uppercase font-semibold">Điểm:</span>
+                    <span id="display-score" class="font-black text-xl text-amber-300">0</span>
+                </div>
+            </div>
+
+            <!-- Time Progression Bar -->
+            <div class="w-full h-2 bg-gray-950 rounded-full overflow-hidden mb-6">
+                <div id="timer-progress" class="h-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 transition-all duration-1000" style="width: 100%"></div>
+            </div>
+
+            <!-- Level Badge & Progress -->
+            <div class="flex justify-between items-center mb-4">
+                <span id="question-level-badge" class="px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider">Level</span>
+                <span id="question-progress-text" class="text-xs text-gray-400 font-mono">Câu 1/10</span>
+            </div>
+
+            <!-- Main Question block -->
+            <div class="bg-gray-950/60 border border-gray-800 rounded-2xl p-6 md:p-8 mb-6 relative">
+                <div id="question-text" class="text-lg md:text-xl font-bold text-gray-100 leading-relaxed">
+                    Đang tải câu hỏi...
+                </div>
+            </div>
+
+            <!-- Options Grid (Grid of Answers) -->
+            <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Bottom Navigation Bar & Explanation Panel -->
+            <div id="nav-and-explanation" class="hidden flex flex-col gap-4 border-t border-gray-800 pt-6">
+                <!-- Result explanation alert -->
+                <div id="feedback-alert" class="p-4 rounded-xl flex items-start gap-3">
+                    <span id="feedback-icon-container" class="text-2xl mt-0.5"></span>
+                    <div>
+                        <h4 id="feedback-title" class="font-extrabold text-sm uppercase">Kết quả</h4>
+                        <div id="feedback-explanation" class="text-xs text-gray-300 mt-1 leading-relaxed"></div>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <button id="btn-action" onclick="handleActionButton()" class="w-full md:w-auto self-end px-6 py-3 bg-gradient-to-r from-cyan-500 to-fuchsia-600 rounded-xl text-white font-extrabold text-sm uppercase tracking-wider transition-all duration-200 shadow-md">
+                    Tiếp tục <i class="fa-solid fa-chevron-right ml-2"></i>
+                </button>
+            </div>
+        </section>
+
+
+        <!-- ================= RESULT / SCORE SCREEN ================= -->
+        <section id="result-screen" class="w-full bg-[#111827]/80 border border-emerald-500/30 rounded-3xl p-6 md:p-10 shadow-2xl backdrop-blur-xl hidden flex flex-col items-center">
+            
+            <!-- Confetti visual trigger & Trophy icon -->
+            <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-4xl text-white shadow-neon-cyan mb-6 animate-bounce">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+
+            <!-- Finished Heading -->
+            <h2 class="text-3xl md:text-4xl font-black uppercase text-center mb-1">
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-500 neon-glow-cyan">KẾT QUẢ CUỘC CHINH PHỤC</span>
+            </h2>
+            <p class="text-xs text-gray-400 font-mono uppercase tracking-widest text-center mb-6">Bảng điểm vinh danh đấu sĩ</p>
+
+            <!-- Leaderboard card / Score block -->
+            <div class="w-full max-w-lg bg-gray-950/60 border border-gray-800 rounded-2xl p-6 mb-8 text-center flex flex-col items-center relative overflow-hidden">
+                <div class="absolute -top-12 -left-12 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+                <div class="absolute -bottom-12 -right-12 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl pointer-events-none"></div>
+
+                <!-- High score circle -->
+                <div class="w-36 h-36 rounded-full border-4 border-emerald-500/40 flex flex-col items-center justify-center mb-4 bg-gray-900/40 relative">
+                    <span class="text-xs text-emerald-400 uppercase font-black tracking-widest">ĐIỂM SỐ</span>
+                    <span id="final-score" class="text-5xl font-black text-white leading-none my-1">0</span>
+                    <span class="text-xs text-gray-400">/ 100 ĐIỂM</span>
+                </div>
+
+                <h3 id="final-student-name" class="text-xl font-bold text-white">Học sinh</h3>
+                <p id="final-student-class" class="text-sm text-cyan-400 font-mono mb-4">Lớp: -</p>
+
+                <!-- Detailed performance counter -->
+                <div class="grid grid-cols-2 gap-4 w-full border-t border-gray-800 pt-4 mt-2">
+                    <div class="text-center">
+                        <span class="block text-xs text-gray-400 uppercase">Trả lời Đúng</span>
+                        <span id="final-correct" class="text-lg font-bold text-emerald-400">0 / 10 câu</span>
+                    </div>
+                    <div class="text-center">
+                        <span class="block text-xs text-gray-400 uppercase">Thời gian dùng</span>
+                        <span id="final-time-used" class="text-lg font-bold text-cyan-400">00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Question Review Accordion -->
+            <div class="w-full max-w-3xl mb-8">
+                <button onclick="toggleReviewSection()" class="w-full bg-gray-900/60 hover:bg-gray-900 border border-gray-800 px-6 py-4 rounded-xl flex justify-between items-center transition-all duration-200">
+                    <span class="font-bold text-sm uppercase tracking-wide text-gray-300"><i class="fa-solid fa-list-check mr-2 text-fuchsia-500"></i>Xem lại chi tiết câu hỏi</span>
+                    <i id="accordion-arrow" class="fa-solid fa-chevron-down text-gray-400 transition-transform duration-200"></i>
+                </button>
+
+                <!-- Accordion content -->
+                <div id="review-container" class="hidden space-y-4 mt-4 max-h-[400px] overflow-y-auto pr-2">
+                    <!-- Dynamically rendered review list -->
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex gap-4">
+                <button onclick="restartGame()" class="px-6 py-3 bg-gray-900/80 hover:bg-gray-800 border border-gray-700 text-gray-300 font-bold rounded-xl text-sm transition-all duration-200">
+                    <i class="fa-solid fa-rotate-left mr-2"></i> Chơi lại từ đầu
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer copyright info -->
+    <footer class="w-full border-t border-gray-900 py-4 text-center text-xs text-gray-600 bg-gray-950/20 z-10 font-mono uppercase tracking-wider">
+        <span>© 2026 - TRÒ CHƠI CHINH PHỤC LƯỢNG GIÁC - ĐỘC QUYỀN GEMINI</span>
+    </footer>
+
+    <!-- ================= JAVASCRIPT GAME ENGINE ================= -->
+    <script>
+        // Question Bank Setup
+        const questions = [
+            {
+                level: "Nhận biết",
+                levelColor: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",
+                question: "Tập xác định <span class='math-style text-fuchsia-400'>D</span> của hàm số <span class='math-style text-fuchsia-400'>y</span> = tan <span class='math-style text-fuchsia-400'>x</span> là:",
+                options: [
+                    "A. <span class='math-style'>D</span> = ℝ \\ {<span class='math-style'>k</span>π, <span class='math-style'>k ∈ ℤ</span>}",
+                    "B. <span class='math-style'>D</span> = ℝ \\ {<sup>π</sup>&frasl;<sub>2</sub> + <span class='math-style'>k</span>π, <span class='math-style'>k ∈ ℤ</span>}",
+                    "C. <span class='math-style'>D</span> = ℝ",
+                    "D. <span class='math-style'>D</span> = [-1; 1]"
+                ],
+                correctAnswer: 1, // Index B
+                explanation: "Hàm số <span class='math-style'>y = tan x</span> xác định khi <span class='math-style'>cos x ≠ 0</span>, tức là <span class='math-style'>x ≠ <sup>π</sup>&frasl;<sub>2</sub> + kπ (k ∈ ℤ)</span>. Do đó tập xác định của hàm số là <span class='math-style'>D = ℝ \\ {<sup>π</sup>&frasl;<sub>2</sub> + kπ, k ∈ ℤ}</span>."
+            },
+            {
+                level: "Nhận biết",
+                levelColor: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",
+                question: "Hàm số nào sau đây là hàm số chẵn trên tập xác định của nó?",
+                options: [
+                    "A. <span class='math-style'>y</span> = sin <span class='math-style'>x</span>",
+                    "B. <span class='math-style'>y</span> = cos <span class='math-style'>x</span>",
+                    "C. <span class='math-style'>y</span> = tan <span class='math-style'>x</span>",
+                    "D. <span class='math-style'>y</span> = cot <span class='math-style'>x</span>"
+                ],
+                correctAnswer: 1, // Index B
+                explanation: "Ta có tập xác định của hàm số <span class='math-style'>y = cos x</span> là <span class='math-style'>D = ℝ</span>. Với mọi <span class='math-style'>x ∈ D</span> thì <span class='math-style'>-x ∈ D</span> và <span class='math-style'>cos(-x) = cos x</span>. Do đó hàm số <span class='math-style'>y = cos x</span> là hàm số chẵn."
+            },
+            {
+                level: "Nhận biết",
+                levelColor: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",
+                question: "Chu kỳ tuần hoàn <span class='math-style text-fuchsia-400'>T</span> của hàm số <span class='math-style text-fuchsia-400'>y</span> = sin <span class='math-style text-fuchsia-400'>x</span> là bao nhiêu?",
+                options: [
+                    "A. <span class='math-style'>T</span> = π",
+                    "B. <span class='math-style'>T</span> = <sup>π</sup>&frasl;<sub>2</sub>",
+                    "C. <span class='math-style'>T</span> = 2π",
+                    "D. <span class='math-style'>T</span> = 3π"
+                ],
+                correctAnswer: 2, // Index C
+                explanation: "Theo định nghĩa của hàm tuần hoàn lượng giác cơ bản, hàm số <span class='math-style'>y = sin x</span> tuần hoàn với chu kỳ cơ sở là <span class='math-style'>T = 2π</span>."
+            },
+            {
+                level: "Thông hiểu",
+                levelColor: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30",
+                question: "Tập giá trị <span class='math-style text-fuchsia-400'>T</span> của hàm số <span class='math-style text-fuchsia-400'>y</span> = 3cos <span class='math-style text-fuchsia-400'>x</span> - 1 là:",
+                options: [
+                    "A. <span class='math-style'>T</span> = [-1; 1]",
+                    "B. <span class='math-style'>T</span> = [-4; 2]",
+                    "C. <span class='math-style'>T</span> = [-3; 3]",
+                    "D. <span class='math-style'>T</span> = [-2; 2]"
+                ],
+                correctAnswer: 1, // Index B
+                explanation: "Ta có: <span class='math-style'>-1 ≤ cos x ≤ 1</span><br>Nhân toàn bộ vế với 3: <span class='math-style'>-3 ≤ 3cos x ≤ 3</span><br>Trừ đi 1: <span class='math-style'>-3 - 1 ≤ 3cos x - 1 ≤ 3 - 1</span><br>Tức là: <span class='math-style'>-4 ≤ y ≤ 2</span>. Vậy tập giá trị của hàm số là <span class='math-style'>T = [-4; 2]</span>."
+            },
+            {
+                level: "Thông hiểu",
+                levelColor: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30",
+                question: "Hàm số <span class='math-style text-fuchsia-400'>y</span> = sin <span class='math-style text-fuchsia-400'>x</span> đồng biến trên khoảng nào sau đây?",
+                options: [
+                    "A. (0; π)",
+                    "B. (<sup>π</sup>&frasl;<sub>2</sub>; <sup>3π</sup>&frasl;<sub>2</sub>)",
+                    "C. (-<sup>π</sup>&frasl;<sub>2</sub>; <sup>π</sup>&frasl;<sub>2</sub>)",
+                    "D. (π; 2π)"
+                ],
+                correctAnswer: 2, // Index C
+                explanation: "Hàm số lượng giác <span class='math-style'>y = sin x</span> đồng biến trên các khoảng dạng <span class='math-style'>(-<sup>π</sup>&frasl;<sub>2</sub> + k2π; <sup>π</sup>&frasl;<sub>2</sub> + k2π)</span>. Với <span class='math-style'>k = 0</span>, khoảng đồng biến là <span class='math-style'>(-<sup>π</sup>&frasl;<sub>2</sub>; <sup>π</sup>&frasl;<sub>2</sub>)</span>."
+            },
+            {
+                level: "Thông hiểu",
+                levelColor: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30",
+                question: "Tìm tập xác định <span class='math-style text-fuchsia-400'>D</span> của hàm số <span class='math-style text-fuchsia-400'>y</span> = <sup>1</sup>&frasl;<sub>(sin x - 1)</sub>.",
+                options: [
+                    "A. <span class='math-style'>D</span> = ℝ \\ {<sup>π</sup>&frasl;<sub>2</sub> + <span class='math-style'>k</span>2π, <span class='math-style'>k ∈ ℤ</span>}",
+                    "B. <span class='math-style'>D</span> = ℝ \\ {<span class='math-style'>k</span>π, <span class='math-style'>k ∈ ℤ</span>}",
+                    "C. <span class='math-style'>D</span> = ℝ \\ {<sup>π</sup>&frasl;<sub>2</sub> + <span class='math-style'>k</span>π, <span class='math-style'>k ∈ ℤ</span>}",
+                    "D. <span class='math-style'>D</span> = ℝ"
+                ],
+                correctAnswer: 0, // Index A
+                explanation: "Hàm số xác định khi mẫu số khác 0: <span class='math-style'>sin x - 1 ≠ 0 ⇔ sin x ≠ 1 ⇔ x ≠ <sup>π</sup>&frasl;<sub>2</sub> + k2π (k ∈ ℤ)</span>. Vậy tập xác định là <span class='math-style'>D = ℝ \\ {<sup>π</sup>&frasl;<sub>2</sub> + k2π, k ∈ ℤ}</span>."
+            },
+            {
+                level: "Vận dụng",
+                levelColor: "bg-orange-500/20 text-orange-400 border border-orange-500/30",
+                question: "Chu kỳ tuần hoàn <span class='math-style text-fuchsia-400'>T</span> của hàm số <span class='math-style text-fuchsia-400'>y</span> = cos(2<span class='math-style text-fuchsia-400'>x</span> + <sup>π</sup>&frasl;<sub>3</sub>) là:",
+                options: [
+                    "A. <span class='math-style'>T</span> = 2π",
+                    "B. <span class='math-style'>T</span> = π",
+                    "C. <span class='math-style'>T</span> = <sup>π</sup>&frasl;<sub>2</sub>",
+                    "D. <span class='math-style'>T</span> = 4π"
+                ],
+                correctAnswer: 1, // Index B
+                explanation: "Chu kỳ tuần hoàn của hàm số <span class='math-style'>y = cos(ax + b)</span> được tính theo công thức: <span class='math-style'>T = <sup>2π</sup>&frasl;<sub>|a|</sub></span>. Ở đây <span class='math-style'>a = 2</span>, do đó <span class='math-style'>T = <sup>2π</sup>&frasl;<sub>2</sub> = π</span>."
+            },
+            {
+                level: "Vận dụng",
+                levelColor: "bg-orange-500/20 text-orange-400 border border-orange-500/30",
+                question: "Tìm giá trị lớn nhất (<span class='math-style text-fuchsia-400'>M</span>) và giá trị nhỏ nhất (<span class='math-style text-fuchsia-400'>m</span>) của hàm số <span class='math-style text-fuchsia-400'>y</span> = sin<sup>2</sup> <span class='math-style text-fuchsia-400'>x</span> - 4sin <span class='math-style text-fuchsia-400'>x</span> + 5.",
+                options: [
+                    "A. <span class='math-style'>M</span> = 10, <span class='math-style'>m</span> = 2",
+                    "B. <span class='math-style'>M</span> = 5, <span class='math-style'>m</span> = 2",
+                    "C. <span class='math-style'>M</span> = 8, <span class='math-style'>m</span> = 2",
+                    "D. <span class='math-style'>M</span> = 10, <span class='math-style'>m</span> = 1"
+                ],
+                correctAnswer: 0, // Index A
+                explanation: "Đặt <span class='math-style'>t = sin x</span> với <span class='math-style'>t ∈ [-1; 1]</span>.<br>Hàm số thành: <span class='math-style'>f(t) = t<sup>2</sup> - 4t + 5</span>.<br>Đỉnh của Parabol có hoành độ <span class='math-style'>t<sub>0</sub> = -<sup>b</sup>&frasl;<sub>2a</sub> = 2 ∉ [-1; 1]</span>.<br>Tính giá trị tại hai đầu mút:<br><span class='math-style'>f(-1) = (-1)<sup>2</sup> - 4(-1) + 5 = 10</span> (Đây là giá trị lớn nhất <span class='math-style'>M</span>)<br><span class='math-style'>f(1) = 1<sup>2</sup> - 4(1) + 5 = 2</span> (Đây là giá trị nhỏ nhất <span class='math-style'>m</span>).<br>Vậy <span class='math-style'>M = 10, m = 2</span>."
+            },
+            {
+                level: "Vận dụng",
+                levelColor: "bg-orange-500/20 text-orange-400 border border-orange-500/30",
+                question: "Đồ thị hàm số <span class='math-style text-fuchsia-400'>y</span> = tan <span class='math-style text-fuchsia-400'>x</span> đối xứng qua tâm đối xứng nào sau đây?",
+                options: [
+                    "A. Gốc tọa độ <span class='math-style'>O</span>(0;0)",
+                    "B. Điểm <span class='math-style'>I</span>(<sup>π</sup>&frasl;<sub>2</sub>; 0)",
+                    "C. Điểm <span class='math-style'>J</span>(π; 1)",
+                    "D. Trục tung <span class='math-style'>Oy</span>"
+                ],
+                correctAnswer: 0, // Index A
+                explanation: "Hàm số <span class='math-style'>y = tan x</span> là hàm lẻ trên tập xác định. Theo tính chất hình học, đồ thị của hàm số lẻ luôn đối xứng qua gốc tọa độ <span class='math-style'>O</span>(0;0)."
+            },
+            {
+                level: "Vận dụng cao",
+                levelColor: "bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse",
+                question: "Có bao nhiêu giá trị nguyên của tham số <span class='math-style text-fuchsia-400'>m</span> để hàm số <span class='math-style text-fuchsia-400'>y</span> = <sup>2</sup>&frasl;<sub>√(m - 2sin x)</sub> xác định trên toàn trục số ℝ?",
+                options: [
+                    "A. 1",
+                    "B. 2",
+                    "C. Vô số",
+                    "D. 0"
+                ],
+                correctAnswer: 2, // Index C
+                explanation: "Hàm số xác định trên toàn bộ ℝ khi và chỉ khi biểu thức trong căn dưới mẫu luôn dương:<br><span class='math-style'>m - 2sin x > 0, ∀x ∈ ℝ ⇔ m > 2sin x, ∀x ∈ ℝ</span>.<br>Điều này tương đương <span class='math-style'>m > max(2sin x)</span>.<br>Mà <span class='math-style'>max(2sin x) = 2</span> (đạt được khi <span class='math-style'>sin x = 1</span>).<br>Suy ra <span class='math-style'>m > 2</span>. Vì tập hợp các giá trị nguyên thỏa mãn là <span class='math-style'>{3, 4, 5, ...}</span> nên có vô số giá trị nguyên thỏa mãn."
+            }
+        ];
+
+        // Game State Variables
+        let currentQuestionIdx = 0;
+        let score = 0;
+        let timer = 480; // 8 minutes in seconds
+        let timerInterval = null;
+        let studentName = "";
+        let studentClass = "";
+        let answersHistory = []; // Tracks user selections
+
+        // Select DOM Elements
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const optionsContainer = document.getElementById('options-container');
+
+        // Validation for start
+        function validateInputs() {
+            const nameInput = document.getElementById('student-name').value.trim();
+            const classInput = document.getElementById('student-class').value.trim();
+            const alertBox = document.getElementById('validation-alert');
+            
+            if (nameInput === "" || classInput === "") {
+                alertBox.classList.remove('invisible');
+                return false;
+            }
+            alertBox.classList.add('invisible');
+            studentName = nameInput;
+            studentClass = classInput;
+            return true;
+        }
+
+        // START GAME
+        function startGame() {
+            playSound('click');
+            if (!validateInputs()) return;
+
+            // Set profile data
+            document.getElementById('display-student-name').innerText = studentName;
+            document.getElementById('display-student-class').innerText = "Lớp: " + studentClass;
+
+            // Transition Screen
+            welcomeScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+
+            // Reset scores & logic
+            currentQuestionIdx = 0;
+            score = 0;
+            timer = 480;
+            answersHistory = [];
+            document.getElementById('display-score').innerText = score;
+
+            // Load first question & Start Timer
+            loadQuestion();
+            startTimer();
+        }
+
+        // TIMER LOGIC
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            const timerDisplay = document.getElementById('display-timer');
+            const timerProgress = document.getElementById('timer-progress');
+            const timerIcon = document.getElementById('timer-icon');
+
+            timerInterval = setInterval(() => {
+                timer--;
+                
+                // Formatted string MM:SS
+                let mins = Math.floor(timer / 60);
+                let secs = timer % 60;
+                timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+                // Progression percentage
+                let percentage = (timer / 480) * 100;
+                timerProgress.style.width = percentage + "%";
+
+                // Visual alerts based on time left
+                if (timer <= 60) { // 1 min left - Red panic
+                    timerProgress.style.backgroundImage = "linear-gradient(to right, #ef4444, #f43f5e)";
+                    timerDisplay.className = "font-mono font-bold text-lg text-rose-500 animate-pulse";
+                    timerIcon.className = "fa-solid fa-triangle-exclamation text-rose-500 animate-bounce text-lg";
+                } else if (timer <= 240) { // 4 min left - Yellow warning
+                    timerProgress.style.backgroundImage = "linear-gradient(to right, #eab308, #f59e0b)";
+                    timerDisplay.className = "font-mono font-bold text-lg text-amber-400";
+                    timerIcon.className = "fa-solid fa-stopwatch text-amber-400 text-lg";
+                } else {
+                    timerProgress.style.backgroundImage = "linear-gradient(to right, #06b6d4, #d946ef)";
+                    timerDisplay.className = "font-mono font-bold text-lg text-white";
+                    timerIcon.className = "fa-solid fa-stopwatch text-cyan-400 animate-pulse text-lg";
+                }
+
+                // Time Up
+                if (timer <= 0) {
+                    clearInterval(timerInterval);
+                    playSound('incorrect');
+                    alert("⚠️ ĐÃ HẾT GIỜ LÀM BÀI! Hệ thống đang tự động tổng hợp kết quả của bạn.");
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        // LOAD QUESTION
+        function loadQuestion() {
+            const currentQ = questions[currentQuestionIdx];
+            
+            // Progress tracker texts
+            document.getElementById('question-progress-text').innerText = `Câu ${currentQuestionIdx + 1}/${questions.length}`;
+            
+            // Badge design
+            const badge = document.getElementById('question-level-badge');
+            badge.innerText = currentQ.level;
+            badge.className = `px-3 py-1 text-xs font-black rounded-full uppercase tracking-wider ${currentQ.levelColor}`;
+
+            // Set question text HTML
+            document.getElementById('question-text').innerHTML = currentQ.question;
+
+            // Set navigation controls hidden initially
+            document.getElementById('nav-and-explanation').classList.add('hidden');
+
+            // Render option buttons
+            optionsContainer.innerHTML = '';
+            currentQ.options.forEach((option, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left bg-gray-900/40 hover:bg-gray-900 border border-gray-800 hover:border-cyan-500/40 rounded-2xl px-6 py-4 flex items-center gap-3 transition-all duration-150 transform hover:-translate-y-0.5 active:translate-y-0";
+                btn.setAttribute("onclick", `selectAnswer(${idx})`);
+                btn.id = `option-btn-${idx}`;
+                btn.innerHTML = `
+                    <span id="bullet-${idx}" class="w-8 h-8 rounded-full bg-gray-950 border border-gray-800 text-xs font-bold flex items-center justify-center text-cyan-400 font-mono select-none">${String.fromCharCode(65 + idx)}</span>
+                    <span class="text-sm font-semibold text-gray-200 select-none">${option}</span>
+                `;
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        // HANDLE ANSWER SELECTION
+        function selectAnswer(selectedIdx) {
+            const currentQ = questions[currentQuestionIdx];
+            const isCorrect = selectedIdx === currentQ.correctAnswer;
+
+            // Lock further inputs immediately
+            const optionButtons = optionsContainer.getElementsByTagName('button');
+            for (let i = 0; i < optionButtons.length; i++) {
+                optionButtons[i].removeAttribute('onclick'); // Disable click events
+                optionButtons[i].className = optionButtons[i].className.replace('hover:bg-gray-900', '');
+                optionButtons[i].className = optionButtons[i].className.replace('hover:border-cyan-500/40', '');
+            }
+
+            // Save history for summary screen
+            answersHistory.push({
+                questionIdx: currentQuestionIdx,
+                selectedIdx: selectedIdx,
+                isCorrect: isCorrect
+            });
+
+            // Update scores
+            if (isCorrect) {
+                playSound('correct');
+                score += 10;
+                document.getElementById('display-score').innerText = score;
+                
+                // Success styling
+                const btn = document.getElementById(`option-btn-${selectedIdx}`);
+                btn.className += " border-emerald-500 bg-emerald-500/10 shadow-neon-green";
+                document.getElementById(`bullet-${selectedIdx}`).className = "w-8 h-8 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center font-mono shadow-md";
+                
+                // Show feedback banner green
+                showFeedbackBanner(true, "Tuyệt vời! Câu trả lời chính xác.", currentQ.explanation);
+            } else {
+                playSound('incorrect');
+                // Failure styling
+                const btnWrong = document.getElementById(`option-btn-${selectedIdx}`);
+                btnWrong.className += " border-rose-500 bg-rose-500/10 shadow-neon-red";
+                document.getElementById(`bullet-${selectedIdx}`).className = "w-8 h-8 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center justify-center font-mono shadow-md";
+
+                // Highlight correct answer
+                const btnRight = document.getElementById(`option-btn-${currentQ.correctAnswer}`);
+                btnRight.className += " border-emerald-500 bg-emerald-500/10";
+                document.getElementById(`bullet-${currentQ.correctAnswer}`).className = "w-8 h-8 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center font-mono shadow-md";
+
+                // Show feedback banner red
+                showFeedbackBanner(false, "Chưa chính xác rồi!", currentQ.explanation);
+            }
+
+            // Show explanation block and confirm button
+            document.getElementById('nav-and-explanation').classList.remove('hidden');
+            
+            // Adjust label of button
+            const btnAction = document.getElementById('btn-action');
+            if (currentQuestionIdx === questions.length - 1) {
+                btnAction.innerHTML = `Hoàn thành cuộc thi <i class="fa-solid fa-flag-checkered ml-2"></i>`;
+            } else {
+                btnAction.innerHTML = `Tiếp tục <i class="fa-solid fa-chevron-right ml-2"></i>`;
+            }
+        }
+
+        // SHOW FEEDBACK BANNER
+        function showFeedbackBanner(isCorrect, title, explanation) {
+            const banner = document.getElementById('feedback-alert');
+            const iconContainer = document.getElementById('feedback-icon-container');
+            const titleDisplay = document.getElementById('feedback-title');
+            const expDisplay = document.getElementById('feedback-explanation');
+
+            if (isCorrect) {
+                banner.className = "p-4 rounded-xl flex items-start gap-3 bg-emerald-950/40 border border-emerald-500/20";
+                iconContainer.className = "text-2xl mt-0.5 text-emerald-400";
+                iconContainer.innerHTML = `<i class="fa-solid fa-circle-check"></i>`;
+                titleDisplay.className = "font-extrabold text-sm uppercase text-emerald-400";
+            } else {
+                banner.className = "p-4 rounded-xl flex items-start gap-3 bg-rose-950/40 border border-rose-500/20";
+                iconContainer.className = "text-2xl mt-0.5 text-rose-400";
+                iconContainer.innerHTML = `<i class="fa-solid fa-circle-xmark"></i>`;
+                titleDisplay.className = "font-extrabold text-sm uppercase text-rose-400";
+            }
+
+            titleDisplay.innerText = title;
+            expDisplay.innerHTML = `<p class='font-bold text-gray-200 mb-1'>LỜI GIẢI CHI TIẾT:</p> ${explanation}`;
+        }
+
+        // NEXT STEP BUTTON TRIGGER
+        function handleActionButton() {
+            playSound('click');
+            if (currentQuestionIdx < questions.length - 1) {
+                currentQuestionIdx++;
+                loadQuestion();
+            } else {
+                endGame();
+            }
+        }
+
+        // END GAME DISPLAY RESULT
+        function endGame() {
+            clearInterval(timerInterval);
+            playSound('victory');
+            
+            // Shower confetti
+            triggerConfetti();
+
+            // Transition Screen
+            gameScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+
+            // Render stats card
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('final-student-name').innerText = studentName;
+            document.getElementById('final-student-class').innerText = "Lớp: " + studentClass;
+
+            const correctCount = answersHistory.filter(h => h.isCorrect).length;
+            document.getElementById('final-correct').innerText = `${correctCount} / 10 câu`;
+
+            // Calculate exact time used
+            const timeUsedSecs = 480 - timer;
+            let usedMins = Math.floor(timeUsedSecs / 60);
+            let usedSecs = timeUsedSecs % 60;
+            document.getElementById('final-time-used').innerText = `${usedMins.toString().padStart(2, '0')}:${usedSecs.toString().padStart(2, '0')}`;
+
+            // Render review accordion
+            renderReviewAccordion();
+        }
+
+        // CONFETTI EFFECT
+        function triggerConfetti() {
+            const count = 200;
+            const defaults = {
+                origin: { y: 0.7 }
+            };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            fire(0.25, {
+                spread: 26,
+                startVelocity: 55,
+            });
+            fire(0.2, {
+                spread: 60,
+            });
+            fire(0.35, {
+                spread: 100,
+                decay: 0.91,
+                scalar: 0.8
+            });
+            fire(0.1, {
+                spread: 120,
+                startVelocity: 25,
+                decay: 0.92,
+                scalar: 1.2
+            });
+            fire(0.1, {
+                spread: 120,
+                startVelocity: 45,
+            });
+        }
+
+        // RENDER DETAILED ACCORDION LIST
+        function renderReviewAccordion() {
+            const reviewContainer = document.getElementById('review-container');
+            reviewContainer.innerHTML = '';
+
+            questions.forEach((q, idx) => {
+                const historyItem = answersHistory.find(h => h.questionIdx === idx);
+                const selectedAnsText = historyItem ? q.options[historyItem.selectedIdx] : "<span class='text-rose-400 font-bold'>Không trả lời (Hết giờ)</span>";
+                const isItemCorrect = historyItem ? historyItem.isCorrect : false;
+
+                const card = document.createElement('div');
+                card.className = "bg-gray-950/60 border border-gray-800 rounded-xl p-5 text-left relative overflow-hidden";
+
+                // Sidebar border based on correct/incorrect
+                const sidebarColor = isItemCorrect ? "bg-emerald-500" : "bg-rose-500";
+                card.innerHTML = `
+                    <div class="absolute top-0 left-0 bottom-0 w-1.5 ${sidebarColor}"></div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="px-2 py-0.5 rounded text-[10px] uppercase font-black tracking-widest ${q.levelColor}">${q.level}</span>
+                        <span class="text-xs font-bold font-mono ${isItemCorrect ? 'text-emerald-400' : 'text-rose-400'}">
+                            ${isItemCorrect ? '<i class="fa-solid fa-circle-check mr-1"></i> +10 Điểm' : '<i class="fa-solid fa-circle-xmark mr-1"></i> 0 Điểm'}
+                        </span>
+                    </div>
+                    <h4 class="font-bold text-sm text-gray-100 mb-3 leading-relaxed">Câu ${idx + 1}: ${q.question}</h4>
+                    
+                    <div class="space-y-1.5 text-xs bg-gray-900/40 p-3 rounded-lg border border-gray-900 mb-3">
+                        <div class="flex items-baseline gap-1.5">
+                            <span class="text-gray-400 uppercase font-bold min-w-[100px] shrink-0 block">Lựa chọn của bạn:</span>
+                            <span class="${isItemCorrect ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium'}">${selectedAnsText}</span>
+                        </div>
+                        <div class="flex items-baseline gap-1.5">
+                            <span class="text-gray-400 uppercase font-bold min-w-[100px] shrink-0 block">Đáp án đúng:</span>
+                            <span class="text-emerald-400 font-medium font-bold">${q.options[q.correctAnswer]}</span>
+                        </div>
+                    </div>
+
+                    <div class="text-xs border-t border-gray-900 pt-3 text-gray-300">
+                        <p class="font-extrabold text-gray-400 uppercase mb-1">Lời giải chi tiết:</p>
+                        <p class="leading-relaxed text-gray-400">${q.explanation}</p>
+                    </div>
+                `;
+                reviewContainer.appendChild(card);
+            });
+        }
+
+        // ACCORDION SLIDE TOGGLE
+        function toggleReviewSection() {
+            playSound('click');
+            const reviewContainer = document.getElementById('review-container');
+            const arrow = document.getElementById('accordion-arrow');
+
+            if (reviewContainer.classList.contains('hidden')) {
+                reviewContainer.classList.remove('hidden');
+                arrow.className = "fa-solid fa-chevron-up text-gray-400 transition-transform duration-200";
+            } else {
+                reviewContainer.classList.add('hidden');
+                arrow.className = "fa-solid fa-chevron-down text-gray-400 transition-transform duration-200";
+            }
+        }
+
+        // RESTART GAME
+        function restartGame() {
+            playSound('click');
+            
+            // Reset fields
+            document.getElementById('student-name').value = '';
+            document.getElementById('student-class').value = '';
+            document.getElementById('validation-alert').classList.add('invisible');
+
+            // Hide result, show welcome screen
+            resultScreen.classList.add('hidden');
+            welcomeScreen.classList.remove('hidden');
+
+            // Close review section
+            document.getElementById('review-container').classList.add('hidden');
+            document.getElementById('accordion-arrow').className = "fa-solid fa-chevron-down text-gray-400";
+        }
+    </script>
+</body>
